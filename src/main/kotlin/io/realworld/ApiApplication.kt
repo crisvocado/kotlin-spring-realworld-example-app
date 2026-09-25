@@ -1,6 +1,7 @@
 package io.realworld
 
 import io.realworld.jwt.ExposeResponseInterceptor
+import io.realworld.logcore.LogcoreTraceInterceptor
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.cache.annotation.EnableCaching
@@ -20,6 +21,7 @@ class ApiApplication : WebMvcConfigurer {
 
     override fun addInterceptors(registry: InterceptorRegistry) {
         registry.addInterceptor(exposeResponseInterceptor())
+        registry.addInterceptor(logcoreTraceInterceptor())
     }
 
     override fun addCorsMappings(registry: CorsRegistry) {
@@ -34,6 +36,9 @@ class ApiApplication : WebMvcConfigurer {
 
     @Bean
     fun exposeResponseInterceptor() = ExposeResponseInterceptor()
+
+    @Bean
+    fun logcoreTraceInterceptor() = LogcoreTraceInterceptor()
 
     @Bean
     fun methodValidationPostProcessor(): MethodValidationPostProcessor {
