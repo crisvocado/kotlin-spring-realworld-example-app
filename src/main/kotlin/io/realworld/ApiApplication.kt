@@ -1,6 +1,7 @@
 package io.realworld
 
 import io.realworld.jwt.ExposeResponseInterceptor
+import io.realworld.logcore.LogcoreAppender
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.cache.annotation.EnableCaching
@@ -47,6 +48,7 @@ class ApiApplication : WebMvcConfigurer {
 }
 
 fun main(args: Array<String>) {
+    LogcoreAppender.attach()
     SpringApplication.run(ApiApplication::class.java, *args)
 }
 
