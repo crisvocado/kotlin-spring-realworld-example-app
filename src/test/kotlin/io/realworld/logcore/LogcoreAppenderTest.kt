@@ -51,8 +51,8 @@ class LogcoreAppenderTest {
         val firstFrame = entry.error!!.stack.first()
         assertNotNull(firstFrame.function)
         assertNotNull(firstFrame.file)
-        assertTrue(firstFrame.line > 0)
-        assertEquals(0, firstFrame.column)
+        assertTrue(firstFrame.line != null && firstFrame.line!! > 0)
+        assertEquals(null, firstFrame.column)
 
         // JSON Serialization check
         val envelope = LogcoreEnvelope(schemaVersion = 1, entries = listOf(entry))

@@ -56,7 +56,7 @@ class LogcoreHttpTransport(
     }
 
     fun enqueue(entry: LogcoreEntry) {
-        if (!config.enabled || !isRunning.get()) return
+        if ((!config.enabled && onSendBatch == null) || !isRunning.get()) return
 
         // Circuit breaker check: if 10 consecutive failures, drop buffer
         if (consecutiveFailures.get() >= MAX_CONSECUTIVE_FAILURES) {
@@ -83,8 +83,8 @@ class LogcoreHttpTransport(
     }
 
     fun flushBatch(all: Boolean = false) {
-        if (!config.enabled) return
-        if (config.url.isNullOrBlank() || config.apiKey.isNullOrBlank()) return
+        if (!config.enabled && onSendBatch == null) return
+        if (onSendBatch == null && (config.url.isNullOrBlank() || config.apiKey.isNullOrBlank())) return
 
         while (queueSize.get() > 0) {
             val batch = mutableListOf<LogcoreEntry>()
@@ -122,6 +122,12 @@ class LogcoreHttpTransport(
         } catch (e: Exception) {
             System.err.println("[logcore] Failed to serialize log entries: ${e.message}")
             return false
+        }
+
+        val localSendHook = onSendBatch
+        if (localSendHook != null) {
+            localSendHook.invoke(jsonPayload)
+            return true
         }
 
         var attempt = 0
@@ -197,6 +203,9 @@ class LogcoreHttpTransport(
         const val MAX_BATCH_SIZE = 200
         const val MAX_RETRIES = 3
         const val MAX_CONSECUTIVE_FAILURES = 10
+
+        @Volatile
+        var onSendBatch: ((String) -> Unit)? = null
 
         @Volatile
         private var instance: LogcoreHttpTransport? = null

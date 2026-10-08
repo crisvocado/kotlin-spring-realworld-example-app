@@ -20,15 +20,13 @@ class LogcoreAppender : AppenderBase<ILoggingEvent>() {
     private val mapper = ObjectMapper().registerKotlinModule()
 
     override fun append(event: ILoggingEvent) {
-        if (!config.enabled && onEntryEmitted == null) return
+        if (!config.enabled && onEntryEmitted == null && LogcoreHttpTransport.onSendBatch == null) return
         if (!event.level.isGreaterOrEqual(Level.toLevel(config.minSeverity, Level.ERROR))) return
 
         try {
             val entry = buildEntry(event)
             onEntryEmitted?.invoke(entry)
-            if (config.enabled) {
-                transport.enqueue(entry)
-            }
+            transport.enqueue(entry)
         } catch (t: Throwable) {
             // Never break application
             System.err.println("[logcore] Error processing log event: ${t.message}")
@@ -50,8 +48,9 @@ class LogcoreAppender : AppenderBase<ILoggingEvent>() {
         val sampledStr = mdc["logcore.sampled"] ?: mdc["sampled"]
         val sampled = sampledStr?.toBooleanStrictOrNull() ?: true
 
-        val trace = if (!traceId.isNullOrBlank() && !spanId.isNullOrBlank()) {
-            LogcoreTrace(traceId = traceId, spanId = spanId, sampled = sampled)
+        val trace = if (!traceId.isNullOrBlank() && traceId.matches(Regex("^[0-9a-f]{32}$"))) {
+            val validSpanId = if (!spanId.isNullOrBlank() && spanId.matches(Regex("^[0-9a-f]{16}$"))) spanId else null
+            LogcoreTrace(traceId = traceId, spanId = validSpanId, sampled = sampled)
         } else {
             null
         }
@@ -107,8 +106,8 @@ class LogcoreAppender : AppenderBase<ILoggingEvent>() {
                 val element = step.stackTraceElement ?: continue
                 val className = element.className ?: ""
                 val methodName = element.methodName ?: ""
-                val fileName = element.fileName ?: "unknown"
-                val lineNumber = if (element.lineNumber > 0) element.lineNumber else 1
+                val fileName = element.fileName
+                val lineNumber = if (element.lineNumber > 0) element.lineNumber else null
                 val inApp = className.startsWith("io.realworld")
 
                 frames.add(
@@ -116,7 +115,7 @@ class LogcoreAppender : AppenderBase<ILoggingEvent>() {
                         function = if (className.isNotEmpty()) "$className.$methodName" else methodName,
                         file = fileName,
                         line = lineNumber,
-                        column = 0,
+                        column = null,
                         inApp = inApp
                     )
                 )
@@ -125,9 +124,14 @@ class LogcoreAppender : AppenderBase<ILoggingEvent>() {
             if (frames.size >= 50) break
         }
 
+        val rawType = rootProxy.className ?: "Error"
+        val errorType = if (rawType.length > 256) rawType.take(256) else rawType
+        val rawMessage = rootProxy.message ?: rootProxy.className ?: "Error"
+        val errorMessage = if (rawMessage.length > 65536) rawMessage.take(65536) else rawMessage
+
         return LogcoreError(
-            type = rootProxy.className ?: "Error",
-            message = rootProxy.message ?: "",
+            type = errorType,
+            message = errorMessage,
             stack = frames.take(50)
         )
     }
