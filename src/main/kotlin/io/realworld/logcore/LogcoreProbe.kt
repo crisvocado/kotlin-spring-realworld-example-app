@@ -1,33 +1,41 @@
 package io.realworld.logcore
 
-import ch.qos.logback.classic.Logger
-import ch.qos.logback.classic.LoggerContext
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.slf4j.LoggerFactory
+import kotlin.system.exitProcess
 
 object LogcoreProbe {
     @JvmStatic
     fun main(args: Array<String>) {
-        val mapper = ObjectMapper().registerKotlinModule()
-        var emittedEntryJson: String? = null
+        var capturedEnvelopeJson: String? = null
 
-        val context = LoggerFactory.getILoggerFactory() as LoggerContext
-        val rootLogger = context.getLogger(Logger.ROOT_LOGGER_NAME)
-        rootLogger.detachAndStopAllAppenders()
-
-        LogcoreAppender.onEntryEmitted = { entry ->
-            emittedEntryJson = mapper.writeValueAsString(entry)
+        LogcoreHttpTransport.sendHandler = { _, _, body ->
+            capturedEnvelopeJson = body
+            true
         }
 
-        LogcoreAppender.install(context)
-        val logger = LoggerFactory.getLogger(LogcoreProbe::class.java)
-        logger.error("logcore probe test error", RuntimeException("logcore probe exception"))
+        try {
+            LogcoreAppender.install()
+            val logger = LoggerFactory.getLogger(LogcoreProbe::class.java)
 
-        LogcoreHttpTransport.closeInstance()
+            try {
+                throw IllegalStateException("Logcore probe verification synthetic failure")
+            } catch (ex: Exception) {
+                logger.error("Logcore probe test error: ${ex.message}", ex)
+            }
 
-        if (emittedEntryJson != null) {
-            println(emittedEntryJson)
+            LogcoreHttpTransport.flushSync()
+
+            val output = capturedEnvelopeJson
+            if (output.isNullOrBlank()) {
+                System.err.println("[logcore-probe] Failed: No log entry was captured by the transport.")
+                exitProcess(1)
+            }
+
+            println(output)
+            exitProcess(0)
+        } finally {
+            LogcoreHttpTransport.sendHandler = null
+            LogcoreHttpTransport.closeInstance()
         }
     }
 }

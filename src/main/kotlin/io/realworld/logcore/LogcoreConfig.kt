@@ -16,6 +16,7 @@ data class LogcoreConfig(
 
         fun load(): LogcoreConfig {
             val rawUrl = System.getenv("LOGCORE_URL")?.trim()?.takeIf { it.isNotEmpty() }
+                ?: "https://logcore-dev-352942961463.us-east4.run.app"
             val rawKey = System.getenv("LOGCORE_KEY")?.trim()?.takeIf { it.isNotEmpty() }
             val rawEnabled = System.getenv("LOGCORE_ENABLED")?.trim()?.lowercase(Locale.ROOT)
 
@@ -27,16 +28,17 @@ data class LogcoreConfig(
             } else if (isExplicitlyEnabled) {
                 true
             } else {
-                !rawUrl.isNullOrEmpty() && !rawKey.isNullOrEmpty()
+                !rawKey.isNullOrEmpty()
             }
 
             val rawService = System.getenv("LOGCORE_SERVICE")?.trim()?.lowercase(Locale.ROOT) ?: "api"
             val service = if (SERVICE_NAME_REGEX.matches(rawService)) {
                 rawService
             } else {
-                rawService.filter { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }
+                val cleaned = rawService.filter { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }
+                    .trimStart('.', '_', '-')
                     .take(63)
-                    .ifEmpty { "api" }
+                if (SERVICE_NAME_REGEX.matches(cleaned)) cleaned else "api"
             }
 
             val rawEnv = System.getenv("LOGCORE_ENV")?.trim()?.lowercase(Locale.ROOT) ?: "dev"

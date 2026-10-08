@@ -29,8 +29,8 @@ data class LogcoreEntry(
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class LogcoreTrace(
     val traceId: String,
-    val spanId: String,
-    val sampled: Boolean = true
+    val spanId: String? = null,
+    val sampled: Boolean? = null
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -43,8 +43,8 @@ data class LogcoreError(
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class LogcoreStackFrame(
     val function: String,
-    val file: String,
-    val line: Int,
-    val column: Int = 0,
+    val file: String? = null,
+    val line: Int? = null,
+    val column: Int? = null,
     val inApp: Boolean
 )
